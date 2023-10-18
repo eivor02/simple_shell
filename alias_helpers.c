@@ -1,10 +1,10 @@
 #include "shell.h"
 
-int shell_status; // Renamed 'status' to 'shell_status' for uniqueness
+int status;
 
 /**
  * free_aliases - frees all aliases
- * @alias_ptr: pointer to head of alias list
+ * @alias_ptr: ptr to head of alias list
  *
  * Return: TRUE
  */
@@ -25,7 +25,8 @@ int free_aliases(alias *alias_ptr)
 }
 
 /**
- * check_if_alias - checks if the command is an alias and replaces it
+ * check_if_alias - if the alias command is not called, this will check if the
+ * command is an alias, and if so replace it with it's value
  * @args: argument to be checked
  * @alias_ptr: points to list of aliases to be checked against
  *
@@ -46,7 +47,7 @@ int check_if_alias(char **args, alias *alias_ptr)
 }
 
 /**
- * print_aliases - prints all aliases in the list
+ * print_aliases - prints all aliases in list
  * @alias_ptr: points to list of aliases
  *
  * Return: SKIP_FORK
@@ -57,7 +58,8 @@ int print_aliases(alias *alias_ptr)
 	{
 		write(STDOUT_FILENO, alias_ptr->name, _strlen(alias_ptr->name));
 		write(STDOUT_FILENO, "=\'", 2);
-		write(STDOUT_FILENO, alias_ptr->value, _strlen(alias_ptr->value));
+		write(STDOUT_FILENO, alias_ptr->value,
+		      _strlen(alias_ptr->value));
 		write(STDOUT_FILENO, "\'\n", 2);
 		alias_ptr = alias_ptr->next;
 	}
@@ -80,14 +82,15 @@ int print_alias_value(char *arg, alias *alias_ptr)
 		{
 			write(STDOUT_FILENO, arg, _strlen(arg));
 			write(STDOUT_FILENO, "=\'", 2);
-			write(STDOUT_FILENO, alias_ptr->value, _strlen(alias_ptr->value));
+			write(STDOUT_FILENO, alias_ptr->value,
+			      _strlen(alias_ptr->value));
 			write(STDOUT_FILENO, "\'\n", 2);
 			return (TRUE);
 		}
 		alias_ptr = alias_ptr->next;
 	}
 
-	shell_status = 1; // Updated 'status' to 'shell_status' for uniqueness
+	status = 1;
 	write(STDERR_FILENO, "alias: ", 7);
 	write(STDERR_FILENO, arg, _strlen(arg));
 	write(STDERR_FILENO, " not found\n", 11);
@@ -105,7 +108,8 @@ int print_alias_value(char *arg, alias *alias_ptr)
  */
 int set_alias_value(char *arg, alias *alias_ptr, char *new_value)
 {
-	while (alias_ptr->next != NULL && str_compare(alias_ptr->name, arg, MATCH) != TRUE)
+	while (alias_ptr->next != NULL
+	       && str_compare(alias_ptr->name, arg, MATCH) != TRUE)
 	{
 		alias_ptr = alias_ptr->next;
 	}

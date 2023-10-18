@@ -1,23 +1,17 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include "shell.h"
-
-#define MAX_COMMAND_LENGTH 1024
 
 int status;
 
 /**
- * set_env - sets an environmental variable
+ * _setenv - sets and environmental variable
  * @name: name of the variable
  * @value: value to set the variable to
  *
  * Return: 0 on success
  */
-int set_env(const char *name, const char *value)
+int _setenv(const char *name, const char *value)
 {
-	char **new_environment;
+	char **new_environ;
 	char *buffer;
 	char *buf_tmp;
 	char *element_ptr;
@@ -27,96 +21,80 @@ int set_env(const char *name, const char *value)
 	{
 		write(STDERR_FILENO, "setenv: no value given\n", 23);
 		status = 2;
-		return 1;
+		return (SKIP_FORK);
 	}
 
-	buffer = strdup(name);
-	buffer = strcat(buffer, "=");
+	buffer = str_concat((char *)name, "=");
 
-	element_ptr = getenv(buffer);
+	element_ptr = get_array_element(environ, buffer);
 
-	buf_tmp = strdup(buffer);
-	buf_tmp = strcat(buf_tmp, value);
+	buf_tmp = str_concat(buffer, (char *)value);
 	free(buffer);
 	buffer = buf_tmp;
 
 	if (element_ptr == NULL)
 	{
-		len = 0;
-		while (environ[len] != NULL)
-			len++;
-
-		new_environment = malloc((len + 2) * sizeof(char *));
-		for (int i = 0; i < len; i++)
-			new_environment[i] = strdup(environ[i]);
-		new_environment[len] = strdup(buffer);
-		new_environment[len + 1] = NULL;
-
-		free(environ);
-		environ = new_environment;
-		return 1;
+		len = list_len(environ, NULL);
+		new_environ = array_cpy(environ, len + 1);
+		new_environ[len - 1] = buffer;
+		new_environ[len] = NULL;
+		free_array(environ);
+		environ = new_environ;
+		return (SKIP_FORK);
 	}
 
-	len = 0;
-	while (environ[len] != NULL)
-	{
-		if (strncmp(environ[len], name, strlen(name)) == 0)
-		{
-			free(environ[len]);
-			environ[len] = strdup(buffer);
-			return 1;
-		}
-		len++;
-	}
+	len = list_len(environ, (char *)name);
+	free(environ[len]);
+	environ[len] = buffer;
 
 	status = 0;
-	return 1;
+
+	return (SKIP_FORK);
 }
 
 /**
- * unset_env - deletes an environmental variable
+ * _unsetenv - deletes an environmental variable
  * @name: name of variable
  *
  * Return: 0 if successful
  */
-int unset_env(const char *name)
+int _unsetenv(const char *name)
 {
 	char **env_ptr;
 	char *buffer;
 	int len;
 
-	buffer = strdup(name);
-	buffer = strcat(buffer, "=");
-	len = 0;
-	while (environ[len] != NULL)
+	buffer = str_concat((char *)name, "=");
+	len = list_len(environ, buffer);
+	free(buffer);
+
+	if (len == -1)
 	{
-		if (strncmp(environ[len], buffer, strlen(buffer)) == 0)
-		{
-			free(environ[len]);
-			env_ptr = &environ[len];
-			while (*(env_ptr + 1) != NULL)
-			{
-				*env_ptr = *(env_ptr + 1);
-				env_ptr++;
-			}
-			*env_ptr = NULL;
-			return 1;
-		}
-		len++;
+		write(STDERR_FILENO, "unsetenv: variable not found\n", 29);
+		status = 2;
+		return (SKIP_FORK);
 	}
 
-	write(STDERR_FILENO, "unsetenv: variable not found\n", 29);
-	status = 2;
-	return 1;
+	env_ptr = environ + len;
+	free(*env_ptr);
+	while (*(env_ptr + 1) != NULL)
+	{
+		*env_ptr = *(env_ptr + 1);
+		env_ptr++;
+	}
+	*env_ptr = NULL;
+	status = 0;
+
+	return (SKIP_FORK);
 }
 
 /**
- * change_directory - changes the current working directory
+ * change_dir - changes the current working directory
  * @name: name of directory to change to
  *
  * Return: 0 if successful
  */
-int change_directory(char *name)
+int change_dir(char *name)
 {
 	char *home;
 	char *pwd;
@@ -129,68 +107,129 @@ int change_directory(char *name)
 
 	if (name == NULL)
 	{
-		home = getenv("HOME");
+		home = get_array_element(environ, "HOME=");
 		if (home == NULL)
 		{
 			status = 2;
-			fprintf(stderr, "cd: no home directory\n");
-			return 1;
+			err_message("cd", name);
+			return (SKIP_FORK);
 		}
 
-		i = chdir(home);
+		home += 5;
+
+		i = chdir((const char *)home);
 		if (i != -1)
-			set_env("PWD", home);
+			_setenv("PWD", (const char *)home);
 	}
-	else if (strcmp("-", name) == 0)
+	else if (str_compare("-", name, MATCH) == TRUE)
 	{
-		pwd = getenv("OLDPWD");
+		pwd = get_array_element(environ, "OLDPWD=");
 		if (pwd == NULL)
 		{
 			status = 2;
-			fprintf(stderr, "cd: no previous directory\n");
-			return 1;
+			err_message("cd", name);
+			return (SKIP_FORK);
 		}
 
-		i = chdir(pwd);
+		pwd += 7;
+
+		i = chdir((const char *)pwd);
 		if (i != -1)
 		{
-			printf("%s\n", pwd);
-			set_env("PWD", pwd);
+			write(STDOUT_FILENO, pwd, _strlen(pwd));
+			write(STDOUT_FILENO, "\n", 1);
+			_setenv("PWD", (const char *)pwd);
 		}
 	}
 	else if (name != NULL)
 	{
-		i = chdir(name);
+		i = chdir((const char *)name);
 		if (i != -1)
-			set_env("PWD", getcwd(new_path_buffer, buf_size));
+			_setenv("PWD", getcwd(new_path_buffer, buf_size));
 	}
-
 	if (i == -1)
 	{
 		status = 2;
-		fprintf(stderr, "cd: no such file or directory: %s\n", name);
-		return 1;
+		err_message("cd", name);
+		return (SKIP_FORK);
 	}
 
 	status = 0;
-	set_env("OLDPWD", old_path_buffer);
+	_setenv("OLDPWD", (const char *)old_path_buffer);
 
-	return 1;
+	return (SKIP_FORK);
 }
 
 /**
- * alias_command - handles command aliases
+ * alias_func - deals with command aliases
  * @args: arguments from command line
- * @to_free: indicate if aliases need to be freed (exiting shell)
+ * @to_free: indicated if aliases need to be freed (exiting shell);
  *
- * Return: 1 if exiting, 0 if the command is not "Sure! Here's a simple UNIX command line interpreter implemented in Python:
+ * Return: TRUE if exiting, FALSE if the command is not "alias" or an alias,
+ * SKIP_FORK if success
+ */
+int alias_func(char **args, int to_free)
+{
+	static alias head = {NULL, NULL, NULL};
+	char *char_ptr;
+	int no_error = TRUE;
 
-```python
-import os
+	if (to_free == TRUE)
+		return (free_aliases(head.next));
 
-while True:
-    command = input('$ ')
-    try:
-        os.system(command)
-    except FileNotFoundError:
-        print('Command not found')
+	if (str_compare("alias", *args, MATCH) != TRUE)
+		return (check_if_alias(args, head.next));
+
+	args++;
+
+	if (*args == NULL)
+		return (print_aliases(head.next));
+
+	while (*args != NULL)
+	{
+		char_ptr = *args;
+		while (*char_ptr != '\0' && *char_ptr != '=')
+			char_ptr++;
+
+		if (*char_ptr == '\0' || char_ptr == *args)
+		{
+			if (print_alias_value(*args, &head) == FALSE)
+				no_error = FALSE;
+		}
+		else
+		{
+			*char_ptr = '\0';
+			char_ptr++;
+			set_alias_value(*args, &head, char_ptr);
+			*(char_ptr - 1) = '=';
+		}
+		args++;
+	}
+
+	if (no_error == FALSE)
+		return (SKIP_FORK);
+
+	status = 0;
+	return (SKIP_FORK);
+}
+
+/**
+ * print_env - prints the environment
+ *
+ * Return: TRUE
+ */
+int print_env(void)
+{
+	char **ptr = environ;
+
+	while (*ptr != NULL)
+	{
+		write(STDOUT_FILENO, *ptr, _strlen(*ptr));
+		write(STDOUT_FILENO, "\n", 1);
+		ptr++;
+	}
+
+	status = 0;
+
+	return (SKIP_FORK);
+}
