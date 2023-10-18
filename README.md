@@ -1,97 +1,81 @@
-# simple_shell project repository
+# Simple Shell
 
-This repository contains the files for Holberton's **simple_shell**. It can be compiled using GCC and will execute a simple shell that can be used for some basic tasks and programs most commonly found in the /bin/ folder.
+This is a simple shell. It executes commands, including those with arguments.
+It follows the [betty style guide](https://github.com/holbertonschool/Betty/wiki)
+It can be used with or without a full path name.
+It can be used to execute standard commands in the PATH such as ls and pwd.
 
-# Pre-requisites
-
-### Authorized functions and macros:
-
-- access (man 2 access)
-- chdir (man 2 chdir)
-- close (man 2 close)
-- closedir (man 3 closedir)
-- execve (man 2 execve)
-- exit (man 3 exit)
-- \_exit (man 2 \_exit)
-- fflush (man 3 fflush)
-- fork (man 2 fork)
-- free (man 3 free)
-- getcwd (man 3 getcwd)
-- getline (man 3 getline)
-- isatty (man 3 isatty)
-- kill (man 2 kill)
-- malloc (man 3 malloc)
-- open (man 2 open)
-- opendir (man 3 opendir)
-- perror (man 3 perror)
-- read (man 2 read)
-- readdir (man 3 readdir)
-- signal (man 2 signal)
-- stat (\_\_xstat) (man 2 stat)
-- lstat (\_\_lxstat) (man 2 lstat)
-- fstat (\_\_fxstat) (man 2 fstat)
-- strtok (man 3 strtok)
-- wait (man 2 wait)
-- waitpid (man 2 waitpid)
-- wait3 (man 2 wait3)
-- wait4 (man 2 wait4)
-- write (man 2 write)
-
-### GCC command to compile:
-
-`gcc -Wall -Werror -Wextra -pedantic *.c -o hsh`
-
-This wil compile all the '.c' files and change the output's name to 'hsh'.
-
-### Template to test output:
-
-=============
-$ ./hsh
-
-($)
-
-hsh main.c shell.c
-
-$ exit
+## Directions for Use
+Compile with this command:
+```
+gcc -Wall -Werror -Wextra -pedantic *.c -o <shell name here>
+```
+Invoke shell by typing its path name
+```
+old_shell$ ./shell
 $
-
-After you clone this repository and compile the program with the command above, you will generate a file called **hsh** that can be executed by entering `./hsh` in your shell.
-
-The output after the program is executed should look something like this:
-
-```
-$|
 ```
 
-Where you will get a prompt in the shape of a dollar sign so you can start typing commands into your shell. Agood example of how it should execute is the command shown above were the user enters 'ls' and then gets a list of the directory contents.
+## Built-ins
+* cd - change directory
+```
+$ cd /home
+$ pwd
+home
+```
+* exit - exit shell
+```
+$ exit 99
+old_shell$ echo $?
+99
+```
+* alias - create an alias
+```
+$ alias pwd=ls
+$ pwd
+hello_world.txt
+```
+* setenv - set an environmental variable
+```
+$ setenv HELLO world
+$ echo $HELLO
+world
+```
+* unsetenv - unset an env
+```
+$ unsetenv HELLO
+$ echo $HELLO
 
-## Function Prototypes:
+$
+```
+* env - list all environmental variables
+```
+$ env
+XDG_SESSION_ID=4
+TERM=xterm-256color
+...
+```
 
-Brief description of functions contained in project:
+## Other Features:
+* && and || logical operators
+```
+$ ls
+hello_world.txt
+$ asgdnja || ls
+./shell: 1: asgdnja: not found
+hello_world.txt
+```
+* semicolon separator
+```
+$ ls; pwd
+hello_world.txt
+/home
+```
+* limited variable expansion
+```
+$ echo ~
+/home/vagrant
+```
 
-**\_strcmpdir** : compares strings to find dir.
-**find_command** : finds command to execute in path routes.
-**charput** : writes the character like putchar.
-**place** : similar to puts in C.
-**\_strlen** : string length.
-**str_concat** : concatenate strings.
-**lookforslash** : identify if first char is a '/'.
-**compareExit** : checks if user typed exit.
-**compareEnv** : checks if user typed env.
-**execute_proc** : receives command and args from getline to be executed.
-**identify_string** : returns pointer with folder address.
-**prompt** : infinite loop with fork to keep prompt going.
-**controlC**: avoid program closing when pressing ctrl + c.
-**main**: initialize program.
-
-README.md: this.
-
-## General Flow Chart:
-
-<a href="https://ibb.co/1MMmc0J"><img src="https://i.ibb.co/5kkRZ1x/Untitled-Diagram.png" alt="Untitled-Diagram" border="0"></a>
-
-### Contact Info:
-
-Git: [Camilo Baquero](https://github.com/camilooob), [Sergio Pietri](https://github.com/Virteip)
-
-Twitter: [@camilooob](https://twitter.com/camilooob), [@sergiopietri](https://twitter.com/sergiopietri)
+## Blog Post
+Check it out [here](https://medium.com/simple-shell-project/what-happens-when-you-type-ls-l-in-the-shell-e6430f1e6671)
