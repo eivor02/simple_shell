@@ -1,10 +1,10 @@
-.TH man 1 "17 March 2018" "0.0" "simple shell man page"
+.TH man 1 "17 oct 2023" "0.0" "simple shell man page"
 .SH NAME
 .B simple shell
 - execute keyboard commands from the terminal
 .SH SYNONSIS
 .B ./hsh
- ... [COMMAND] [OPTION] [ARGUMENT]
+... [COMMAND] [OPTION] [ARGUMENT]
 .SH DESCRIPTION
 Simple Shell executes commands taken from standard input and shows the results on standard output.
 .SH OPTIONS
@@ -18,4 +18,4 @@ Simple Shell's environment starts as the same as shell and user calling it, but 
 .SH BUGS
 There are limitations, such as the absence of wildcards
 .SH AUTHORS
-Miranda Evans and Daniel Kazemian
+Saif eddine belhaj
