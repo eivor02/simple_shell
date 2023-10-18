@@ -3,15 +3,62 @@
 int status;
 
 /**
- * _set_or_unset_env - sets or unsets an environmental variable.
+ * _setenv - sets and environmental variable
+ * @name: name of the variable
+ * @value: value to set the variable to
  *
- * @name: Name of the variable.
- * @value: Value to set the variable to, or NULL to unset the variable.
- * @to_unset: Whether to unset the variable.
- *
- * Return: 0 on success.
+ * Return: 0 on success
  */
-int _set_or_unset_env(const char *name, const char *value, bool to_unset)
+int _setenv(const char *name, const char *value)
+{
+	char **new_environ;
+	char *buffer;
+	char *buf_tmp;
+	char *element_ptr;
+	int len;
+
+	if (value == NULL)
+	{
+		write(STDERR_FILENO, "setenv: no value given\n", 23);
+		status = 2;
+		return (SKIP_FORK);
+	}
+
+	buffer = str_concat((char *)name, "=");
+
+	element_ptr = get_array_element(environ, buffer);
+
+	buf_tmp = str_concat(buffer, (char *)value);
+	free(buffer);
+	buffer = buf_tmp;
+
+	if (element_ptr == NULL)
+	{
+		len = list_len(environ, NULL);
+		new_environ = array_cpy(environ, len + 1);
+		new_environ[len - 1] = buffer;
+		new_environ[len] = NULL;
+		free_array(environ);
+		environ = new_environ;
+		return (SKIP_FORK);
+	}
+
+	len = list_len(environ, (char *)name);
+	free(environ[len]);
+	environ[len] = buffer;
+
+	status = 0;
+
+	return (SKIP_FORK);
+}
+
+/**
+ * _unsetenv - deletes an environmental variable
+ * @name: name of variable
+ *
+ * Return: 0 if successful
+ */
+int _unsetenv(const char *name)
 {
 	char **env_ptr;
 	char *buffer;
@@ -23,70 +70,22 @@ int _set_or_unset_env(const char *name, const char *value, bool to_unset)
 
 	if (len == -1)
 	{
-		// The environment variable does not exist.
-		if (to_unset)
-		{
-			write(STDERR_FILENO, "unsetenv: variable not found\n", 29);
-			status = 2;
-			return SKIP_FORK;
-		}
-		else
-		{
-			// Create the new environment variable.
-			char **new_environ = array_cpy(environ, list_len(environ, NULL) + 1);
-			new_environ[list_len(environ, NULL) - 1] = str_concat((char *)name, "=");
-			new_environ[list_len(environ, NULL)] = NULL;
-			free_array(environ);
-			environ = new_environ;
-		}
+		write(STDERR_FILENO, "unsetenv: variable not found\n", 29);
+		status = 2;
+		return (SKIP_FORK);
 	}
-	else
+
+	env_ptr = environ + len;
+	free(*env_ptr);
+	while (*(env_ptr + 1) != NULL)
 	{
-		env_ptr = environ + len;
-		if (to_unset)
-		{
-			// Unset the environment variable.
-			free(*env_ptr);
-			while (*(env_ptr + 1) != NULL)
-			{
-				*env_ptr = *(env_ptr + 1);
-				env_ptr++;
-			}
-			*env_ptr = NULL;
-		}
-		else
-		{
-			// Set the environment variable.
-			free(*env_ptr);
-			*env_ptr = str_concat((char *)name, "=");
-		}
+		*env_ptr = *(env_ptr + 1);
+		env_ptr++;
 	}
-
+	*env_ptr = NULL;
 	status = 0;
-	return SKIP_FORK;
-}
 
-/**
- * _setenv - sets and environmental variable
- * @name: name of the variable
- * @value: value to set the variable to
- *
- * Return: 0 on success
- */
-int _setenv(const char *name, const char *value)
-{
-	return _set_or_unset_env(name, value, false);
-}
-
-/**
- * _unsetenv - deletes an environmental variable
- * @name: name of variable
- *
- * Return: 0 if successful
- */
-int _unsetenv(const char *name)
-{
-	return _set_or_unset_env(name, NULL, true);
+	return (SKIP_FORK);
 }
 
 /**
@@ -113,7 +112,7 @@ int change_dir(char *name)
 		{
 			status = 2;
 			err_message("cd", name);
-			return SKIP_FORK;
+			return (SKIP_FORK);
 		}
 
 		home += 5;
@@ -129,7 +128,7 @@ int change_dir(char *name)
 		{
 			status = 2;
 			err_message("cd", name);
-			return SKIP_FORK;
+			return (SKIP_FORK);
 		}
 
 		pwd += 7;
@@ -139,3 +138,98 @@ int change_dir(char *name)
 		{
 			write(STDOUT_FILENO, pwd, _strlen(pwd));
 			write(STDOUT_FILENO, "\n", 1);
+			_setenv("PWD", (const char *)pwd);
+		}
+	}
+	else if (name != NULL)
+	{
+		i = chdir((const char *)name);
+		if (i != -1)
+			_setenv("PWD", getcwd(new_path_buffer, buf_size));
+	}
+	if (i == -1)
+	{
+		status = 2;
+		err_message("cd", name);
+		return (SKIP_FORK);
+	}
+
+	status = 0;
+	_setenv("OLDPWD", (const char *)old_path_buffer);
+
+	return (SKIP_FORK);
+}
+
+/**
+ * alias_func - deals with command aliases
+ * @args: arguments from command line
+ * @to_free: indicated if aliases need to be freed (exiting shell);
+ *
+ * Return: TRUE if exiting, FALSE if the command is not "alias" or an alias,
+ * SKIP_FORK if success
+ */
+int alias_func(char **args, int to_free)
+{
+	static alias head = {NULL, NULL, NULL};
+	char *char_ptr;
+	int no_error = TRUE;
+
+	if (to_free == TRUE)
+		return (free_aliases(head.next));
+
+	if (str_compare("alias", *args, MATCH) != TRUE)
+		return (check_if_alias(args, head.next));
+
+	args++;
+
+	if (*args == NULL)
+		return (print_aliases(head.next));
+
+	while (*args != NULL)
+	{
+		char_ptr = *args;
+		while (*char_ptr != '\0' && *char_ptr != '=')
+			char_ptr++;
+
+		if (*char_ptr == '\0' || char_ptr == *args)
+		{
+			if (print_alias_value(*args, &head) == FALSE)
+				no_error = FALSE;
+		}
+		else
+		{
+			*char_ptr = '\0';
+			char_ptr++;
+			set_alias_value(*args, &head, char_ptr);
+			*(char_ptr - 1) = '=';
+		}
+		args++;
+	}
+
+	if (no_error == FALSE)
+		return (SKIP_FORK);
+
+	status = 0;
+	return (SKIP_FORK);
+}
+
+/**
+ * print_env - prints the environment
+ *
+ * Return: TRUE
+ */
+int print_env(void)
+{
+	char **ptr = environ;
+
+	while (*ptr != NULL)
+	{
+		write(STDOUT_FILENO, *ptr, _strlen(*ptr));
+		write(STDOUT_FILENO, "\n", 1);
+		ptr++;
+	}
+
+	status = 0;
+
+	return (SKIP_FORK);
+}
