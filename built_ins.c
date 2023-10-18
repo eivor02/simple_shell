@@ -3,92 +3,101 @@
 int status;
 
 /**
- * _setenv - Sets an environment variable.
+ * _setenv - sets and environmental variable
+ * @name: name of the variable
+ * @value: value to set the variable to
  *
- * @name: Name of the variable.
- * @value: Value to set the variable to.
- *
- * Return: 0 on success.
+ * Return: 0 on success
  */
 int _setenv(const char *name, const char *value)
 {
+	char **new_environ;
+	char *buffer;
+	char *buf_tmp;
+	char *element_ptr;
+	int len;
+
 	if (value == NULL)
 	{
 		write(STDERR_FILENO, "setenv: no value given\n", 23);
 		status = 2;
-		return SKIP_FORK;
+		return (SKIP_FORK);
 	}
 
-	char *buffer = str_concat((char *)name, "=");
-	char *element_ptr = get_array_element(environ, buffer);
+	buffer = str_concat((char *)name, "=");
 
-	char *buf_tmp = str_concat(buffer, (char *)value);
+	element_ptr = get_array_element(environ, buffer);
+
+	buf_tmp = str_concat(buffer, (char *)value);
 	free(buffer);
 	buffer = buf_tmp;
 
 	if (element_ptr == NULL)
 	{
-		// Add the new environment variable to the environment array.
-		char **new_environ = array_cpy(environ, list_len(environ, NULL) + 1);
-		new_environ[list_len(environ, NULL) - 1] = buffer;
-		new_environ[list_len(environ, NULL)] = NULL;
-		free(environ);
+		len = list_len(environ, NULL);
+		new_environ = array_cpy(environ, len + 1);
+		new_environ[len - 1] = buffer;
+		new_environ[len] = NULL;
+		free_array(environ);
 		environ = new_environ;
-	}
-	else
-	{
-		// Update the value of the existing environment variable.
-		free(environ[list_len(environ, (char *)name)]);
-		environ[list_len(environ, (char *)name)] = buffer;
+		return (SKIP_FORK);
 	}
 
+	len = list_len(environ, (char *)name);
+	free(environ[len]);
+	environ[len] = buffer;
+
 	status = 0;
-	return SKIP_FORK;
+
+	return (SKIP_FORK);
 }
 
 /**
- * _unsetenv - Unsets an environment variable.
+ * _unsetenv - deletes an environmental variable
+ * @name: name of variable
  *
- * @name: Name of the variable.
- *
- * Return: 0 if successful.
+ * Return: 0 if successful
  */
 int _unsetenv(const char *name)
 {
-	char *buffer = str_concat((char *)name, "=");
-	int len = list_len(environ, buffer);
+	char **env_ptr;
+	char *buffer;
+	int len;
+
+	buffer = str_concat((char *)name, "=");
+	len = list_len(environ, buffer);
 	free(buffer);
 
 	if (len == -1)
 	{
-		// The environment variable does not exist.
 		write(STDERR_FILENO, "unsetenv: variable not found\n", 29);
 		status = 2;
-		return SKIP_FORK;
+		return (SKIP_FORK);
 	}
 
-	// Remove the environment variable from the environment array.
-	free(environ[len]);
-	while (*(environ + len + 1) != NULL)
+	env_ptr = environ + len;
+	free(*env_ptr);
+	while (*(env_ptr + 1) != NULL)
 	{
-		*(environ + len) = *(environ + len + 1);
-		environ++;
+		*env_ptr = *(env_ptr + 1);
+		env_ptr++;
 	}
-	*(environ + len) = NULL;
-
+	*env_ptr = NULL;
 	status = 0;
-	return SKIP_FORK;
+
+	return (SKIP_FORK);
 }
 
 /**
- * change_dir - Changes the current working directory.
+ * change_dir - changes the current working directory
+ * @name: name of directory to change to
  *
- * @name: Name of the directory to change to.
- *
- * Return: 0 if successful.
+ * Return: 0 if successful
  */
 int change_dir(char *name)
 {
+	char *home;
+	char *pwd;
 	char old_path_buffer[PATH_MAX];
 	char new_path_buffer[PATH_MAX];
 	size_t buf_size = PATH_MAX;
@@ -98,32 +107,28 @@ int change_dir(char *name)
 
 	if (name == NULL)
 	{
-		// Change to the home directory.
-		char *home = get_array_element(environ, "HOME=");
+		home = get_array_element(environ, "HOME=");
 		if (home == NULL)
 		{
 			status = 2;
 			err_message("cd", name);
-			return SKIP_FORK;
+			return (SKIP_FORK);
 		}
 
 		home += 5;
 
 		i = chdir((const char *)home);
 		if (i != -1)
-		{
 			_setenv("PWD", (const char *)home);
-		}
 	}
 	else if (str_compare("-", name, MATCH) == TRUE)
 	{
-		// Change to the previous working directory.
-		char *pwd = get_array_element(environ, "OLDPWD=");
+		pwd = get_array_element(environ, "OLDPWD=");
 		if (pwd == NULL)
 		{
 			status = 2;
 			err_message("cd", name);
-			return SKIP_FORK;
+			return (SKIP_FORK);
 		}
 
 		pwd += 7;
@@ -131,4 +136,100 @@ int change_dir(char *name)
 		i = chdir((const char *)pwd);
 		if (i != -1)
 		{
-	  write(STDOUT_FILENO, pwd, _strlen
+			write(STDOUT_FILENO, pwd, _strlen(pwd));
+			write(STDOUT_FILENO, "\n", 1);
+			_setenv("PWD", (const char *)pwd);
+		}
+	}
+	else if (name != NULL)
+	{
+		i = chdir((const char *)name);
+		if (i != -1)
+			_setenv("PWD", getcwd(new_path_buffer, buf_size));
+	}
+	if (i == -1)
+	{
+		status = 2;
+		err_message("cd", name);
+		return (SKIP_FORK);
+	}
+
+	status = 0;
+	_setenv("OLDPWD", (const char *)old_path_buffer);
+
+	return (SKIP_FORK);
+}
+
+/**
+ * alias_func - deals with command aliases
+ * @args: arguments from command line
+ * @to_free: indicated if aliases need to be freed (exiting shell);
+ *
+ * Return: TRUE if exiting, FALSE if the command is not "alias" or an alias,
+ * SKIP_FORK if success
+ */
+int alias_func(char **args, int to_free)
+{
+	static alias head = {NULL, NULL, NULL};
+	char *char_ptr;
+	int no_error = TRUE;
+
+	if (to_free == TRUE)
+		return (free_aliases(head.next));
+
+	if (str_compare("alias", *args, MATCH) != TRUE)
+		return (check_if_alias(args, head.next));
+
+	args++;
+
+	if (*args == NULL)
+		return (print_aliases(head.next));
+
+	while (*args != NULL)
+	{
+		char_ptr = *args;
+		while (*char_ptr != '\0' && *char_ptr != '=')
+			char_ptr++;
+
+		if (*char_ptr == '\0' || char_ptr == *args)
+		{
+			if (print_alias_value(*args, &head) == FALSE)
+				no_error = FALSE;
+		}
+		else
+		{
+			*char_ptr = '\0';
+			char_ptr++;
+			set_alias_value(*args, &head, char_ptr);
+			*(char_ptr - 1) = '=';
+		}
+		args++;
+	}
+
+	if (no_error == FALSE)
+		return (SKIP_FORK);
+
+	status = 0;
+	return (SKIP_FORK);
+}
+
+/**
+ * print_env - prints the environment
+ *
+ * Return: TRUE
+ */
+int print_env(void)
+{
+	char **ptr = environ;
+
+	while (*ptr != NULL)
+	{
+		write(STDOUT_FILENO, *ptr, _strlen(*ptr));
+		write(STDOUT_FILENO, "\n", 1);
+		ptr++;
+	}
+
+	status = 0;
+
+	return (SKIP_FORK);
+}
